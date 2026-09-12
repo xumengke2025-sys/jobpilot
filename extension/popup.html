@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>JobPilot 岗位采集</title>
+<style>body{width:370px;padding:18px;background:#f5f8f7;color:#173c36;font:14px/1.5 system-ui}h1{font-size:22px;margin:0}label{display:block;margin-top:9px}input,textarea{display:block;box-sizing:border-box;width:100%;padding:8px;border:1px solid #bdcfca;border-radius:6px}button{padding:9px 14px;border:0;border-radius:6px;color:white;background:#246d5c;margin-top:14px}#status{white-space:pre-wrap;color:#704829}</style>
+<h1>JobPilot</h1><p>先在岗位详情页选中职位描述，再点扩展。核对下方内容后导出。</p>
+<label>岗位名称<input id="title"></label><label>公司名称<input id="company"></label><label>城市<input id="city"></label>
+<label>月薪下限（元，未知留空）<input id="salary_min" type="number" min="0"></label><label>月薪上限（元，未知留空）<input id="salary_max" type="number" min="0"></label>
+<label>岗位要求关键词（逗号分隔）<input id="requirements" placeholder="RAG,需求分析,知识库"></label>
+<label>岗位链接<input id="url"></label><label>岗位描述<textarea id="description" rows="7"></textarea></label>
+<button id="export">导出岗位 JSON</button><p id="status" role="status"></p><script src="popup.js"></script></html>
