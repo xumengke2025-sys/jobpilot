@@ -1,0 +1,20 @@
+{
+  "cities": ["上海", "深圳"],
+  "target_titles": ["AI产品经理", "大模型产品经理"],
+  "min_monthly_salary": 25000,
+  "max_monthly_salary": 40000,
+  "salary_mode": "floor",
+  "industries": ["金融科技", "证券"],
+  "company_sizes": ["100-499人", "500-999人", "1000-9999人"],
+  "funding_stages": [],
+  "experience_bands": ["3-5年", "5-10年"],
+  "education_requirements": ["本科", "硕士", "不限"],
+  "job_types": ["全职"],
+  "work_modes": [],
+  "work_schedules": ["双休"],
+  "excluded_companies": ["示例排除公司"],
+  "excluded_terms": [],
+  "preferred_terms": ["RAG", "知识库"],
+  "min_score": 70,
+  "unknown_policy": "review"
+}

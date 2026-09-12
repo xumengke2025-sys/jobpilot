@@ -1,0 +1,16 @@
+{
+  "name": "网页搜索配置协议示例（非 BOSS 实际控件）",
+  "verified": false,
+  "allowed_hosts": ["example.invalid"],
+  "search": {
+    "query": {"css": "#query"},
+    "submit": {"css": "#search"},
+    "reset_filters": {"css": "#reset-filters"},
+    "results_ready": {"css": "#results-ready"},
+    "filters": {
+      "cities": {"kind": "select", "locator": {"css": "#city"}, "selected": {"css": "#selected-city-label"}, "options": {"上海": "上海", "深圳": "深圳"}, "coverage": "exact"},
+      "salary": {"kind": "menu", "locator": {"css": "#salary-menu"}, "option_role": "option", "selected": {"css": "#selected-salary-label"}, "options": {"floor:20000": "20K以上"}, "coverage": "site_band"}
+    }
+  },
+  "notes": "将这个 search 对象与真实 collect 配置合并。定位器及选项文本必须从实际页面验证，不可照搬此示例。"
+}

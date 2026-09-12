@@ -86,28 +86,9 @@ def match(p, j, policy):
     """Score is coverage, not an interview probability. Unknown hard facts never pass."""
     validate_profile(p)
     j = validate_job(j)
-    reject, unknown = [], []
-    if any(contains(j["company"], c) for c in policy.get("excluded_companies", [])):
-        reject.append("公司在排除名单")
-    cities = policy.get("cities", [])
-    if cities:
-        if not j.get("city"):
-            unknown.append("工作城市未知")
-        elif j["city"] not in cities:
-            reject.append("城市不符合要求")
-    floor = policy.get("min_monthly_salary", 0)
-    if floor:
-        if j.get("salary_min") is None:
-            unknown.append("月薪下限未知（不从宣传文字猜测）")
-        elif j["salary_min"] < floor:
-            reject.append("岗位月薪下限低于要求")
-    text = j["title"] + "\n" + j["description"]
-    for term in policy.get("excluded_terms", []):
-        if contains(text, term):
-            reject.append(f"含排除词：{term}（请检查是否是否定表述）")
-    targets = policy.get("target_titles", [])
-    if targets and not any(contains(j["title"], t) for t in targets):
-        reject.append("岗位名称不在目标范围")
+    from .preferences import evaluate_conditions, normalize_policy
+    policy = normalize_policy(policy)
+    reject, unknown, preferred = evaluate_conditions(p, j, policy)
     if not j.get("requirements"):
         unknown.append("尚未整理岗位技能要求 requirements")
     evidence, missing = {}, []
@@ -122,7 +103,7 @@ def match(p, j, policy):
     if not 0 <= threshold <= 100:
         raise ValueError("min_score 需要在 0 到 100 之间")
     status = "rejected" if reject else "needs_review" if unknown or score < threshold else "matched"
-    return {"status": status, "score": score, "evidence": evidence, "missing": missing, "rejected_reasons": reject, "unknown": unknown}
+    return {"status": status, "score": score, "evidence": evidence, "missing": missing, "rejected_reasons": reject, "unknown": unknown, "preferred_hits": preferred}
 
 
 def tailor(p, j, assessment, selection=None):

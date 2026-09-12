@@ -5,4 +5,12 @@
 <label>月薪下限（元，未知留空）<input id="salary_min" type="number" min="0"></label><label>月薪上限（元，未知留空）<input id="salary_max" type="number" min="0"></label>
 <label>岗位要求关键词（逗号分隔）<input id="requirements" placeholder="RAG,需求分析,知识库"></label>
 <label>岗位链接<input id="url"></label><label>岗位描述<textarea id="description" rows="7"></textarea></label>
+<details><summary>更多岗位条件（未知留空）</summary>
+<label>行业<input id="industry"></label><label>公司规模<input id="company_size" placeholder="100-499人"></label>
+<label>融资阶段<input id="funding_stage"></label><label>经验区间<input id="experience_band" placeholder="3-5年"></label>
+<label>最低工作年限<input id="min_experience_years" type="number" min="0"></label>
+<label>学历要求<input id="required_education" placeholder="本科 / 硕士 / 不限"></label>
+<label>用工形式<input id="job_type" placeholder="全职 / 兼职 / 实习"></label>
+<label>办公方式<input id="work_mode" placeholder="现场 / 远程 / 混合"></label>
+<label>休息安排<input id="work_schedule" placeholder="双休"></label></details>
 <button id="export">导出岗位 JSON</button><p id="status" role="status"></p><script src="popup.js"></script></html>

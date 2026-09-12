@@ -48,10 +48,76 @@ def main():
     cmd.add_argument("--limit", type=int, default=5)
     cmd.add_argument("--daily-limit", type=int, default=10)
     cmd.add_argument("--execute", action="store_true")
+    cmd = sub.add_parser("search-plan", help="根据简历与目标岗位生成 BOSS 搜索计划")
+    cmd.add_argument("--profile", required=True)
+    cmd.add_argument("--policy", required=True)
+    cmd.add_argument("--out")
+    cmd = sub.add_parser("analyze", help="匹配已导入岗位并生成简历修改建议和本地审阅页面")
+    cmd.add_argument("--profile", required=True)
+    cmd.add_argument("--policy", required=True)
+    cmd.add_argument("--out", default="output/cycles")
+    cmd.add_argument("--parent", help="上一轮 cycle_id；在相同岗位上比较变化")
+    cmd.add_argument("--top", type=int, default=10)
+    cmd.add_argument("--ai", action="store_true", help="将经历和岗位发送至配置的模型接口，生成待确认改写")
+    cmd = sub.add_parser("revise", help="应用已确认建议，生成新的简历底稿，不覆盖原文件")
+    cmd.add_argument("--cycle", required=True)
+    cmd.add_argument("--profile", required=True)
+    cmd.add_argument("--decisions", required=True)
+    cmd.add_argument("--out", required=True)
+    sub.add_parser("history", help="查看历轮分析和已确认的简历版本")
+    cmd = sub.add_parser("collect-plan", help="按简历搜索计划在网页设置筛选并采集岗位")
+    cmd.add_argument("--profile", required=True)
+    cmd.add_argument("--policy", required=True)
+    cmd.add_argument("--adapter", required=True)
+    cmd.add_argument("--session", default="browser-profile")
+    cmd.add_argument("--searches", type=int, default=3)
+    cmd.add_argument("--pages", type=int, default=1)
+    cmd.add_argument("--strict-web", action="store_true", help="有期望条件不能映射到网页时停止")
+    cmd.add_argument("--out", default="private/collected-jobs.json")
     a = p.parse_args()
     db = Store(a.db)
     try:
-        if a.cmd == "extract":
+        if a.cmd == "collect-plan":
+            from .assistant import search_plan
+            from .browser import collect
+            if not 1 <= a.searches <= 50:
+                raise ValueError("searches 应在 1 到 50 之间")
+            policy = read_json(a.policy)
+            plan = search_plan(read_json(a.profile), policy)
+            config = read_json(a.adapter)
+            collected = {}
+            output = Path(a.out)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            if output.exists():
+                raise ValueError("采集输出已存在，请用新的文件名保留上一轮记录")
+            for request in plan["queries"][:a.searches]:
+                jobs = collect(request["url"], config, a.session, a.pages, request, policy, a.strict_web)
+                for job in jobs:
+                    db.put_job(job)
+                    collected[job["id"]] = job
+                output.write_text(json.dumps(list(collected.values()), ensure_ascii=False, indent=2), encoding="utf-8")
+            emit({"collected": len(collected), "file": str(output), "next": "核对采集字段后运行 analyze"})
+        elif a.cmd == "search-plan":
+            from .assistant import search_plan
+            result = search_plan(read_json(a.profile), read_json(a.policy))
+            if a.out:
+                Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+                Path(a.out).write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            emit(result)
+        elif a.cmd == "analyze":
+            from .assistant import create_cycle
+            emit(create_cycle(db, read_json(a.profile), read_json(a.policy), a.out, a.parent, a.ai, a.top))
+        elif a.cmd == "revise":
+            from .assistant import revise_profile
+            if Path(a.out).resolve() == Path(a.profile).resolve():
+                raise ValueError("新版本必须使用不同文件名，不能覆盖原简历")
+            emit(revise_profile(db, a.cycle, read_json(a.profile), read_json(a.decisions), a.out))
+        elif a.cmd == "history":
+            from .assistant import init_cycles
+            init_cycles(db)
+            emit({"cycles": [dict(r) for r in db.db.execute("SELECT id,parent_id,profile_hash,created_at FROM resume_cycles ORDER BY created_at")],
+                  "revisions": [dict(r) for r in db.db.execute("SELECT cycle_id,profile_hash,result_hash,created_at FROM resume_revisions ORDER BY created_at")]})
+        elif a.cmd == "extract":
             path = Path(a.file)
             if path.suffix.lower() == ".pdf":
                 from pypdf import PdfReader

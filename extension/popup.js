@@ -13,6 +13,8 @@ $('export').addEventListener('click', () => {
   try {
     const job = {};
     for (const key of ['title','company','url','description','city']) job[key] = $(key).value.trim();
+    for (const key of ['industry','company_size','funding_stage','experience_band','required_education','job_type','work_mode','work_schedule']) job[key] = $(key).value.trim();
+    job.min_experience_years = $('min_experience_years').value === '' ? null : Number($('min_experience_years').value);
     for (const key of ['title','company','url','description']) if (!job[key]) throw new Error('请填写岗位名称、公司、链接和描述');
     const url = new URL(job.url);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('岗位链接格式错误');

@@ -158,7 +158,7 @@ def login(url, profile_dir):
             ctx.close()
 
 
-def collect(url, config, profile_dir, pages=1):
+def collect(url, config, profile_dir, pages=1, search_request=None, policy=None, strict_filters=False):
     """Read public/authorized visible job pages. No hidden endpoint scraping."""
     from playwright.sync_api import sync_playwright
     guard_url(url, config)
@@ -173,6 +173,10 @@ def collect(url, config, profile_dir, pages=1):
         try:
             page = ctx.new_page()
             page.goto(url, wait_until="domcontentloaded")
+            filter_receipt = None
+            if search_request is not None:
+                from .search_filters import apply_search_conditions
+                filter_receipt = apply_search_conditions(page, config, search_request, policy or {}, strict_filters)
             for n in range(pages):
                 check_blocked(page, config)
                 cards = page.locator(c["card_css"])
@@ -190,7 +194,11 @@ def collect(url, config, profile_dir, pages=1):
                         detail.goto(href, wait_until="domcontentloaded")
                         check_blocked(detail, config)
                         job = {key: unique(detail, spec).inner_text().strip() for key, spec in c["detail"].items()}
-                        job.update(url=detail.url, requirements=[], salary_min=None, salary_max=None)
+                        from .preferences import parse_monthly_salary
+                        salary_min, salary_max = parse_monthly_salary(job.get("salary_text", ""))
+                        job.update(url=detail.url, requirements=[], salary_min=salary_min, salary_max=salary_max)
+                        if filter_receipt is not None:
+                            job["web_filter_receipt"] = filter_receipt
                         job = validate_job(job)
                         results[job["id"]] = job
                     finally:

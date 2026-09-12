@@ -13,6 +13,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - run: python -m unittest discover -s tests -v
       - run: python -m jobpilot --db data/demo.sqlite import-jobs examples/jobs.json
       - run: python -m jobpilot --db data/demo.sqlite prepare --profile examples/profile.json --policy examples/policy.json
+      - run: python examples/demo_loop.py

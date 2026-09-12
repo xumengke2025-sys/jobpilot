@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "JobPilot 岗位采集",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "将选中的岗位描述整理为本地 JSON；不发送简历、不读取 Cookie。",
   "permissions": ["activeTab", "scripting"],
   "action": {"default_popup": "popup.html"}
