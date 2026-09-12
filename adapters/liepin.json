@@ -1,0 +1,12 @@
+{
+  "name": "猎聘 — 待登录页面实测",
+  "verified": false,
+  "allowed_hosts": ["www.liepin.com", "c.liepin.com"],
+  "identity": {
+    "company": {"css": "[data-jobpilot-configure-company]"},
+    "title": {"css": "[data-jobpilot-configure-title]"}
+  },
+  "stop_when_visible": [],
+  "steps": [],
+  "notes": "仅预留适配文件，尚未宣称猎聘支持。"
+}
