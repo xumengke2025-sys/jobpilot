@@ -42,13 +42,16 @@ def main():
     cmd.add_argument("--session", default="browser-profile")
     cmd.add_argument("--pages", type=int, default=1)
     cmd.add_argument("--out", required=True)
+    cmd.add_argument("--request", help="search-plan 中的单个搜索任务 JSON；用于填写关键词和城市")
+    cmd.add_argument("--policy", help="与 --request 一起使用，采集后仍按此条件本地复核")
+    cmd.add_argument("--strict-web", action="store_true", help="有条件不能映射到网页时停止")
     cmd = sub.add_parser("run", help="默认只核对页面；--execute 执行本批次投递")
     cmd.add_argument("--adapter", required=True)
     cmd.add_argument("--session", default="browser-profile")
     cmd.add_argument("--limit", type=int, default=5)
     cmd.add_argument("--daily-limit", type=int, default=10)
     cmd.add_argument("--execute", action="store_true")
-    cmd = sub.add_parser("search-plan", help="根据简历与目标岗位生成 BOSS 搜索计划")
+    cmd = sub.add_parser("search-plan", help="根据简历与目标岗位生成 BOSS/猎聘分平台搜索计划")
     cmd.add_argument("--profile", required=True)
     cmd.add_argument("--policy", required=True)
     cmd.add_argument("--out")
@@ -85,12 +88,17 @@ def main():
             policy = read_json(a.policy)
             plan = search_plan(read_json(a.profile), policy)
             config = read_json(a.adapter)
+            from .platforms import normalize_platform
+            platform = normalize_platform(config.get("platform", "other"))
+            requests = [request for request in plan["queries"] if platform == "other" or request["platform"] == platform]
+            if not requests:
+                raise ValueError("求职设置未包含当前适配器对应的平台")
             collected = {}
             output = Path(a.out)
             output.parent.mkdir(parents=True, exist_ok=True)
             if output.exists():
                 raise ValueError("采集输出已存在，请用新的文件名保留上一轮记录")
-            for request in plan["queries"][:a.searches]:
+            for request in requests[:a.searches]:
                 jobs = collect(request["url"], config, a.session, a.pages, request, policy, a.strict_web)
                 for job in jobs:
                     db.put_job(job)
@@ -141,7 +149,14 @@ def main():
             jobs = [validate_job(j) for j in jobs]  # validate batch before first write
             for j in jobs:
                 db.put_job(j)
-            emit({"imported": len(jobs), "unique_total": len(db.jobs())})
+            stored = db.jobs()
+            platforms = {}
+            clusters = {}
+            for job in stored:
+                platforms[job["source_platform"]] = platforms.get(job["source_platform"], 0) + 1
+                clusters.setdefault(job["cluster_id"], []).append(job["id"])
+            emit({"imported": len(jobs), "unique_total": len(stored), "platforms": platforms,
+                  "cross_source_duplicate_clusters": sum(len(ids) > 1 for ids in clusters.values())})
         elif a.cmd == "prepare":
             profile = validate_profile(read_json(a.profile))
             policy = read_json(a.policy)
@@ -183,7 +198,11 @@ def main():
             login(a.url, a.session)
         elif a.cmd == "collect":
             from .browser import collect
-            jobs = collect(a.url, read_json(a.adapter), a.session, a.pages)
+            if bool(a.request) != bool(a.policy):
+                raise ValueError("--request 与 --policy 需要同时提供")
+            request = read_json(a.request) if a.request else None
+            policy = read_json(a.policy) if a.policy else None
+            jobs = collect(a.url, read_json(a.adapter), a.session, a.pages, request, policy, a.strict_web)
             Path(a.out).parent.mkdir(parents=True, exist_ok=True)
             Path(a.out).write_text(json.dumps(jobs, ensure_ascii=False, indent=2), encoding="utf-8")
             for job in jobs:

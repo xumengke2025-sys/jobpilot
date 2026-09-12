@@ -1,5 +1,6 @@
 {
   "name": "猎聘 — 待登录页面实测",
+  "platform": "liepin",
   "verified": false,
   "allowed_hosts": ["www.liepin.com", "c.liepin.com"],
   "identity": {
@@ -8,5 +9,5 @@
   },
   "stop_when_visible": [],
   "steps": [],
-  "notes": "仅预留适配文件，尚未宣称猎聘支持。"
+  "notes": "仅预留适配文件，尚未宣称猎聘支持。猎聘需区分直接投递与在线沟通，并记录企业招聘方/猎头身份和各自回执。"
 }

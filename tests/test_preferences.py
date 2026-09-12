@@ -1,9 +1,9 @@
 import unittest
 from pathlib import Path
 
-from jobpilot.core import match, read_json
-from jobpilot.preferences import normalize_policy, parse_monthly_salary
-from jobpilot.search_filters import apply_search_conditions
+from jobpilot.core import match, read_json, validate_job
+from jobpilot.preferences import normalize_policy, parse_monthly_salary, parse_salary, recruiter_activity_days
+from jobpilot.search_filters import apply_search_conditions, salary_band_keys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,6 +60,41 @@ class PreferencesTests(unittest.TestCase):
         for text in ("20-30万/年", "100-200元/天", "20-30K/年", "面议", "30-20K"):
             self.assertEqual(parse_monthly_salary(text), (None, None))
 
+    def test_platform_salary_formats_keep_period_and_salary_months(self):
+        monthly = parse_salary("20-30k·14薪")
+        self.assertEqual((monthly["basis"], monthly["min"], monthly["months"], monthly["annual_min"]),
+                         ("monthly", 20000, 14, 280000))
+        self.assertEqual(parse_salary("2-3万/月")["min"], 20000)
+        self.assertEqual(parse_salary("20-30万/年")["basis"], "yearly")
+        self.assertEqual(parse_salary("100-200元/天")["basis"], "daily")
+        self.assertEqual(parse_salary("20-30元/时")["basis"], "hourly")
+
+    def test_salary_text_populates_structured_fields_and_annual_policy(self):
+        job = validate_job({**self.job, "salary_min": None, "salary_max": None, "salary_text": "20-30k·13薪"})
+        self.assertEqual(job["annual_salary_min"], 260000)
+        self.assertEqual(match(self.profile, job, {**self.policy, "min_annual_salary": 270000})["status"], "rejected")
+
+    def test_liepin_full_time_degree_is_not_silently_assumed(self):
+        self.profile["education_level"] = "本科"
+        self.profile.pop("education_full_time", None)
+        self.job["required_education"] = "统招本科"
+        result = match(self.profile, self.job, self.policy)
+        self.assertEqual(result["status"], "needs_review")
+        self.assertTrue(any("学历性质" in reason for reason in result["unknown"]))
+
+    def test_benefit_activity_and_job_availability_preferences(self):
+        job = {**self.job, "benefits": ["五险一金", "补充医疗"], "recruiter_active_days": 12, "is_active": False}
+        policy = {**self.policy, "required_benefits": ["五险一金"], "max_recruiter_inactive_days": 7, "active_jobs_only": True}
+        reasons = match(self.profile, job, policy)["rejected_reasons"]
+        self.assertIn("招聘者活跃度低于要求", reasons)
+        self.assertIn("岗位已暂停或关闭", reasons)
+
+    def test_platform_activity_labels_are_parsed_conservatively(self):
+        self.assertEqual(recruiter_activity_days("刚刚活跃"), 0)
+        self.assertEqual(recruiter_activity_days("3日内活跃"), 3)
+        self.assertEqual(recruiter_activity_days("本周活跃"), 7)
+        self.assertIsNone(recruiter_activity_days("近期活跃"))
+
 
 class FilterLocator:
     def __init__(self, page, key):
@@ -112,6 +147,17 @@ class FilterTests(unittest.TestCase):
         self.page.readback = False
         with self.assertRaisesRegex(ValueError, "预期"):
             apply_search_conditions(self.page, self.config, self.request, {"cities": ["上海"]})
+
+    def test_single_select_salary_does_not_drop_valid_higher_bands(self):
+        control = {"multiple": False, "bands": [
+            {"key": "20-50", "label": "20-50K", "min": 20000, "max": 50000},
+            {"key": "50+", "label": "50K以上", "min": 50000, "max": None},
+        ]}
+        keys = salary_band_keys(control, normalize_policy({"min_monthly_salary": 25000, "salary_mode": "floor"}))
+        self.assertEqual(keys, ["20-50", "50+"])
+        self.config["search"]["filters"]["salary"] = {**control, "kind": "menu", "locator": {"css": "#salary"}, "selected": {"css": "#salary-selected"}}
+        result = apply_search_conditions(self.page, self.config, self.request, {"cities": ["上海"], "min_monthly_salary": 25000})
+        self.assertIn("salary", [item["field"] for item in result["local_only"]])
 
 
 if __name__ == "__main__":

@@ -1,16 +1,24 @@
 <!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>JobPilot 岗位采集</title>
-<style>body{width:370px;padding:18px;background:#f5f8f7;color:#173c36;font:14px/1.5 system-ui}h1{font-size:22px;margin:0}label{display:block;margin-top:9px}input,textarea{display:block;box-sizing:border-box;width:100%;padding:8px;border:1px solid #bdcfca;border-radius:6px}button{padding:9px 14px;border:0;border-radius:6px;color:white;background:#246d5c;margin-top:14px}#status{white-space:pre-wrap;color:#704829}</style>
+<style>body{width:400px;padding:18px;background:#f5f8f7;color:#173c36;font:14px/1.5 system-ui}h1{font-size:22px;margin:0}label{display:block;margin-top:9px}input,textarea,select{display:block;box-sizing:border-box;width:100%;padding:8px;border:1px solid #bdcfca;border-radius:6px;background:white}button{padding:9px 14px;border:0;border-radius:6px;color:white;background:#246d5c;margin-top:14px}#status{white-space:pre-wrap;color:#704829}</style>
 <h1>JobPilot</h1><p>先在岗位详情页选中职位描述，再点扩展。核对下方内容后导出。</p>
-<label>岗位名称<input id="title"></label><label>公司名称<input id="company"></label><label>城市<input id="city"></label>
+<label>来源平台<select id="source_platform"><option value="boss">BOSS直聘</option><option value="liepin">猎聘</option><option value="other">其他</option></select></label>
+<label>岗位名称<input id="title"></label><label>公司名称<input id="company"></label><label>城市<input id="city"></label><label>区县<input id="district"></label><label>商圈<input id="business_district"></label>
+<label>页面薪资原文<input id="salary_text" placeholder="20-30K·13薪 / 20-30万/年"></label>
 <label>月薪下限（元，未知留空）<input id="salary_min" type="number" min="0"></label><label>月薪上限（元，未知留空）<input id="salary_max" type="number" min="0"></label>
 <label>岗位要求关键词（逗号分隔）<input id="requirements" placeholder="RAG,需求分析,知识库"></label>
 <label>岗位链接<input id="url"></label><label>岗位描述<textarea id="description" rows="7"></textarea></label>
 <details><summary>更多岗位条件（未知留空）</summary>
 <label>行业<input id="industry"></label><label>公司规模<input id="company_size" placeholder="100-499人"></label>
-<label>融资阶段<input id="funding_stage"></label><label>经验区间<input id="experience_band" placeholder="3-5年"></label>
+<label>融资阶段<input id="funding_stage"></label><label>企业性质<input id="company_nature" placeholder="国企 / 民营 / 外企"></label><label>经验区间<input id="experience_band" placeholder="3-5年 / 3年以上"></label>
 <label>最低工作年限<input id="min_experience_years" type="number" min="0"></label>
-<label>学历要求<input id="required_education" placeholder="本科 / 硕士 / 不限"></label>
+<label>学历要求<input id="required_education" placeholder="本科 / 统招本科 / 硕士 / 不限"></label>
 <label>用工形式<input id="job_type" placeholder="全职 / 兼职 / 实习"></label>
 <label>办公方式<input id="work_mode" placeholder="现场 / 远程 / 混合"></label>
-<label>休息安排<input id="work_schedule" placeholder="双休"></label></details>
+<label>休息安排<input id="work_schedule" placeholder="双休"></label>
+<label>福利（逗号分隔）<input id="benefits" placeholder="五险一金,补充医疗"></label>
+<label>招聘者类型<input id="recruiter_type" placeholder="boss / hr / company_hr / headhunter"></label>
+<label>招聘者名称<input id="recruiter_name"></label><label>招聘者活跃原文<input id="recruiter_activity" placeholder="刚刚活跃 / 3日内活跃"></label>
+<label>距最近活跃天数<input id="recruiter_active_days" type="number" min="0"></label>
+<label>发布日期<input id="published_at" type="date"></label>
+<label>岗位状态<select id="is_active"><option value="">未知</option><option value="true">招聘中</option><option value="false">暂停/关闭</option></select></label></details>
 <button id="export">导出岗位 JSON</button><p id="status" role="status"></p><script src="popup.js"></script></html>

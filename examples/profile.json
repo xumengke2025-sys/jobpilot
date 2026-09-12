@@ -3,6 +3,9 @@
   "headline": "具有企业 AI 应用原型经验的产品经理",
   "contact": "demo@example.invalid",
   "confirmed": true,
+  "years_experience": 2,
+  "education_level": "本科",
+  "education_full_time": true,
   "employment": ["2024.01—至今｜示例科技公司｜产品经理（演示数据）"],
   "education": ["示例大学｜本科（演示数据）"],
   "facts": [

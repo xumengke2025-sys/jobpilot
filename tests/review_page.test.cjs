@@ -6,7 +6,8 @@ const decode = s => s.replace(/&quot;/g,'"').replace(/&#x27;/g,"'").replace(/&lt
 const nodes = {}, policies = [];
 for (const match of html.matchAll(/\bid="([^"]+)"/g)) nodes[match[1]] = {value:'',checked:false,textContent:'',addEventListener(name, fn){this[name]=fn;}};
 for (const match of html.matchAll(/<input\b[^>]*data-policy="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g)) policies.push({dataset:{policy:match[1]}, value:decode(match[2])});
-for (const [id, value] of Object.entries({'policy-min':report.policy.min_monthly_salary,'policy-max':report.policy.max_monthly_salary??'','policy-score':report.policy.min_score,'policy-salary-mode':report.policy.salary_mode,'policy-unknown':report.policy.unknown_policy})) nodes[id].value=String(value);
+for (const [id, value] of Object.entries({'policy-min':report.policy.min_monthly_salary,'policy-max':report.policy.max_monthly_salary??'','policy-annual':report.policy.min_annual_salary,'policy-months':report.policy.min_salary_months??'','policy-age':report.policy.max_job_age_days??'','policy-inactive':report.policy.max_recruiter_inactive_days??'','policy-market-min':report.policy.market_min_jobs,'policy-score':report.policy.min_score,'policy-salary-mode':report.policy.salary_mode,'policy-unknown':report.policy.unknown_policy})) nodes[id].value=String(value);
+nodes['policy-active'].checked=report.policy.active_jobs_only;
 for (const s of report.suggestions) if (nodes['text-'+s.id]) nodes['text-'+s.id].value=s.after;
 nodes['review-data'].textContent = html.match(/<script type="application\/json" id="review-data">([\s\S]*?)<\/script>/)[1];
 let lastBlob, downloads=0;
@@ -15,6 +16,8 @@ vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], {document, Blo
 nodes['download-policy'].click();
 assert.equal(JSON.parse(lastBlob.text).min_monthly_salary, report.policy.min_monthly_salary);
 assert.deepEqual(JSON.parse(lastBlob.text).cities, report.policy.cities);
+assert.equal(JSON.parse(lastBlob.text).market_min_jobs, report.policy.market_min_jobs);
+assert.equal(JSON.parse(lastBlob.text).active_jobs_only, report.policy.active_jobs_only);
 const prior=downloads;
 nodes['policy-min'].value='50000';nodes['policy-max'].value='30000';nodes['download-policy'].click();
 assert.equal(downloads,prior);

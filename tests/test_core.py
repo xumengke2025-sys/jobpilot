@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jobpilot.core import canonical_url, contains, digest, match, read_json, tailor, validate_job, validate_profile
+from jobpilot.core import canonical_url, contains, detect_risk_flags, digest, match, read_json, tailor, validate_job, validate_profile
 from jobpilot.export import render_resume
 from jobpilot.store import Store
 
@@ -46,6 +46,11 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_profile(self.p)
 
+    def test_profile_qualification_fields_are_verified_types(self):
+        self.p["education_full_time"] = "是"
+        with self.assertRaisesRegex(ValueError, "education_full_time"):
+            validate_profile(self.p)
+
     def test_model_cannot_invent_experience(self):
         assessment = match(self.p, self.jobs[0], self.policy)
         with self.assertRaises(ValueError):
@@ -80,6 +85,17 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             canonical_url("https://user:password@example.com/job")
         self.assertNotEqual(validate_job({**self.jobs[0], "url": "https://example.com/?job=1"})["id"], validate_job({**self.jobs[0], "url": "https://example.com/?job=2"})["id"])
+
+    def test_navigation_trackers_do_not_create_duplicate_job_ids(self):
+        one = validate_job({**self.jobs[0], "url": "https://www.zhipin.com/job_detail/abc.html?ka=search_list_1&job=42"})
+        two = validate_job({**self.jobs[0], "url": "https://www.zhipin.com/job_detail/abc.html?ka=search_list_9&job=42&utm_source=x"})
+        self.assertEqual(one["id"], two["id"])
+        self.assertNotEqual(one["url"], two["url"])
+        self.assertEqual(one["source_platform"], "boss")
+
+    def test_risk_signals_are_review_hints_and_handle_simple_negation(self):
+        self.assertEqual(detect_risk_flags("入职需要缴纳押金")[0]["code"], "fee")
+        self.assertEqual(detect_risk_flags("无需押金，不收培训费"), [])
 
     def test_english_tokens_do_not_match_substrings(self):
         self.assertFalse(contains("paid", "AI"))

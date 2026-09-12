@@ -1,5 +1,6 @@
 {
   "name": "BOSS — 待登录页面实测",
+  "platform": "boss",
   "verified": false,
   "allowed_hosts": ["www.zhipin.com", "zhipin.com"],
   "identity": {
@@ -11,5 +12,5 @@
     {"css": "[data-jobpilot-configure-login]"}
   ],
   "steps": [],
-  "notes": "占位配置，不可投递。需在真实账号页面确定身份定位、沟通入口、消息输入、附件选择及回执后填写；不能仅将 verified 改为 true。"
+  "notes": "占位配置，不可投递。BOSS 是直聊主流程：发起沟通、消息发送、交换/发送附件必须分别核对。需在真实账号页面确定搜索控件、身份定位、会话目标、附件选择及新回执后填写；不能仅将 verified 改为 true。"
 }

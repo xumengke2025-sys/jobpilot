@@ -83,6 +83,12 @@ class RunnerTests(unittest.TestCase):
         self.c["verified"] = False
         with self.assertRaises(ValueError):
             run_one(self.page, self.c, self.b, self.tmp.name, self.s, True)
+    def test_wrong_platform_adapter_stops_before_navigation(self):
+        self.c["platform"] = "liepin"
+        self.b["job"]["source_platform"] = "boss"
+        with self.assertRaisesRegex(ValueError, "来源"):
+            run_one(self.page, self.c, self.b, self.tmp.name, self.s)
+        self.assertEqual(self.page.actions, [])
     def test_confirmed_receipt_changes_state(self):
         result = run_one(self.page, self.c, self.b, self.tmp.name, self.s, True)
         self.assertEqual(result["status"], "submitted")

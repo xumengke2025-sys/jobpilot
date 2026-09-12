@@ -6,8 +6,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from jobpilot.assistant import create_cycle, load_cycle, revise_profile, search_plan, validated_ai_suggestions
-from jobpilot.core import digest, read_json, validate_job
+from jobpilot.assistant import create_cycle, expression_coverage, load_cycle, market_insights, revise_profile, search_plan, validated_ai_suggestions
+from jobpilot.core import digest, match, read_json, validate_job
 from jobpilot.store import Store
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,6 +115,32 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual({q["city"] for q in plan["queries"]}, {"上海", "深圳"})
         self.assertTrue(all(q["evidence_ids"] for q in plan["queries"]))
         self.assertNotIn(self.profile["contact"], json.dumps(plan))
+
+    def test_search_plan_models_boss_and_liepin_different_actions(self):
+        plan = search_plan(self.profile, {**self.policy, "platforms": ["boss", "liepin"], "cities": ["上海"], "districts": ["浦东新区"]})
+        self.assertEqual({q["platform"] for q in plan["queries"]}, {"boss", "liepin"})
+        boss = next(q for q in plan["queries"] if q["platform"] == "boss")
+        liepin = next(q for q in plan["queries"] if q["platform"] == "liepin")
+        self.assertEqual(boss["interaction_model"], "direct_chat")
+        self.assertEqual(liepin["interaction_model"], "application_and_chat")
+        self.assertIn("区", next(x for x in boss["filters"] if x["field"] == "districts")["label"])
+
+    def test_market_frequency_deduplicates_cross_platform_copy(self):
+        base = {**self.jobs[0], "title": "AI产品经理", "company": "同一公司", "city": "上海", "requirements": ["RAG"]}
+        jobs = [
+            validate_job({**base, "url": "https://www.zhipin.com/job_detail/a.html", "source_platform": "boss"}),
+            validate_job({**base, "url": "https://www.liepin.com/job/a.shtml", "source_platform": "liepin"}),
+        ]
+        rows = []
+        for job in jobs:
+            assessment = match(self.profile, job, self.policy)
+            rows.append({"job": job, "assessment": assessment, "expression": expression_coverage(self.profile, assessment)})
+        market = market_insights(rows, min_jobs=2)
+        self.assertEqual(market["candidate_jobs"], 2)
+        self.assertEqual(market["distinct_job_clusters"], 1)
+        self.assertEqual(market["requirements"][0]["cluster_count"], 1)
+        self.assertFalse(market["requirements"][0]["recurring"])
+        self.assertEqual(len(market["duplicate_groups"]), 1)
 
     def test_ai_cannot_invent_source_quote_or_metrics(self):
         raw = {"job_id": self.jobs[0]["id"], "fact_id": "F001", "after": "负责需求分析，效率提升80%", "reason": "强调成果", "requirement_quote": "负责企业知识库的需求分析"}

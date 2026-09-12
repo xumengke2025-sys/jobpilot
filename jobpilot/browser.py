@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .core import digest, read_json, validate_job
+from .platforms import allowed_receipt_states, normalize_platform
+from .store import now
 
 
 def guard_url(url, config):
@@ -50,6 +52,7 @@ def check_blocked(page, config):
 def validate_adapter(c):
     if not c.get("allowed_hosts") or not c.get("identity"):
         raise ValueError("适配器必须有域名白名单与岗位身份定位")
+    platform = normalize_platform(c.get("platform", "other"))
     steps = c.get("steps", [])
     for i, s in enumerate(steps):
         if s.get("op") not in ("fill", "upload", "click", "verify"):
@@ -61,7 +64,7 @@ def validate_adapter(c):
         if s["op"] == "upload" and s["source"] == "greeting":
             raise ValueError("上传操作必须选择简历附件")
         if s["op"] == "verify":
-            if s.get("state") not in ("contacted", "message_sent", "attachment_sent", "submitted"):
+            if s.get("state") not in allowed_receipt_states(platform):
                 raise ValueError("回执状态不合法")
             if not s.get("contains"):
                 raise ValueError("回执必须检查内容")
@@ -78,6 +81,9 @@ def run_one(page, config, bundle, directory, store, execute=False):
     validate_adapter(config)
     job, jid = bundle["job"], bundle["job"]["id"]
     guard_url(job["url"], config)
+    adapter_platform = normalize_platform(config.get("platform", "other"))
+    if adapter_platform != "other" and job.get("source_platform") != adapter_platform:
+        raise ValueError("岗位来源与当前平台适配器不一致")
     if execute and config.get("verified") is not True:
         raise ValueError("该平台适配器未经页面验证，不能执行投递")
     if execute and bundle["assessment"]["status"] != "matched":
@@ -194,9 +200,26 @@ def collect(url, config, profile_dir, pages=1, search_request=None, policy=None,
                         detail.goto(href, wait_until="domcontentloaded")
                         check_blocked(detail, config)
                         job = {key: unique(detail, spec).inner_text().strip() for key, spec in c["detail"].items()}
-                        from .preferences import parse_monthly_salary
-                        salary_min, salary_max = parse_monthly_salary(job.get("salary_text", ""))
-                        job.update(url=detail.url, requirements=[], salary_min=salary_min, salary_max=salary_max)
+                        for key, spec in c.get("detail_optional", {}).items():
+                            loc = locate(detail, spec)
+                            job[key] = loc.inner_text().strip() if loc.count() == 1 and loc.is_visible() else ""
+                        for key, spec in c.get("detail_lists", {}).items():
+                            loc = locate(detail, spec)
+                            job[key] = list(dict.fromkeys(v.strip() for v in loc.all_inner_texts() if v.strip()))
+                        from .preferences import parse_salary
+                        salary = parse_salary(job.get("salary_text", ""))
+                        job.update(url=detail.url, requirements=job.get("requirements", []),
+                                   source_platform=normalize_platform(config.get("platform"), detail.url), captured_at=now(),
+                                   salary_basis=salary["basis"], salary_months=salary["months"],
+                                   annual_salary_min=salary["annual_min"], annual_salary_max=salary["annual_max"])
+                        if salary["basis"] == "monthly":
+                            job.update(salary_min=salary["min"], salary_max=salary["max"])
+                        status_text = job.pop("status_text", "")
+                        if status_text:
+                            if any(term in status_text for term in ("暂停招聘", "停止招聘", "职位关闭", "已下线")):
+                                job["is_active"] = False
+                            elif any(term in status_text for term in ("招聘中", "立即投递", "立即沟通", "继续沟通")):
+                                job["is_active"] = True
                         if filter_receipt is not None:
                             job["web_filter_receipt"] = filter_receipt
                         job = validate_job(job)

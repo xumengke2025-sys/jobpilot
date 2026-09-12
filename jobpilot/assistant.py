@@ -9,10 +9,10 @@ import re
 import uuid
 from collections import Counter
 from pathlib import Path
-from urllib.parse import urlencode, urlsplit
 
 from .core import contains, digest, match, read_json, tailor, validate_job, validate_profile
 from .export import export_bundle
+from .platforms import PLATFORM_SPECS, platform_filter_plan, search_entry
 from .store import now
 
 # A bounded vocabulary is a fallback, not an exhaustive understanding of a JD.
@@ -47,17 +47,119 @@ def search_plan(profile, policy):
     if not titles or any(not isinstance(t, str) or not t.strip() for t in titles):
         raise ValueError("请填写至少一个目标岗位名称")
     skills = Counter(k for f in profile["facts"] for k in set(f.get("keywords", [])))
-    plan, seen = [], set()
+    combinations, seen = [], set()
     for title in titles[:4]:
         for term in ["", *[k for k, _ in skills.most_common(3)]]:
             query = f"{title} {term}".strip()
-            if query in seen:
-                continue
-            seen.add(query)
+            if query not in seen:
+                seen.add(query)
+                combinations.append((query, term))
+    platforms = policy["platforms"] or ["boss", "liepin"]
+    plan = []
+    for platform in platforms:
+        spec = PLATFORM_SPECS[platform]
+        for query, term in combinations:
             ids = [f["id"] for f in profile["facts"] if not term or term in f.get("keywords", [])]
             for city in policy["cities"] or [""]:
-                plan.append({"query": query, "city": city, "evidence_ids": ids, "cities": [city] if city else [], "url": "https://www.zhipin.com/web/geek/jobs?" + urlencode({"query": query})})
-    return {"profile_hash": digest(profile), "policy_hash": digest(policy), "conditions": policy, "queries": plan, "note": "这些是基于简历生成的搜索入口，不是已获取的岗位。城市和薪资需在网页核对；若网页未带入关键词，请手动输入。自动采集时会通过已配置控件设置城市等条件。"}
+                plan.append({
+                    "platform": platform,
+                    "platform_name": spec["name"],
+                    "interaction_model": spec["interaction_model"],
+                    "action_note": spec["action_note"],
+                    "query": query,
+                    "city": city,
+                    "evidence_ids": ids,
+                    "cities": [city] if city else [],
+                    "url": search_entry(platform, query),
+                    "filters": platform_filter_plan(platform, policy, city),
+                })
+    return {
+        "profile_hash": digest(profile), "policy_hash": digest(policy), "conditions": policy,
+        "platforms": [{"id": p, "name": PLATFORM_SPECS[p]["name"], "interaction_model": PLATFORM_SPECS[p]["interaction_model"],
+                       "action_note": PLATFORM_SPECS[p]["action_note"]} for p in platforms],
+        "queries": plan,
+        "note": "搜索任务按平台和城市分开。网页筛选只负责缩小候选集；薪酬粗区间、福利、活跃度等仍按原始条件本地复核。猎聘入口可能不预填关键词，页面执行器会填写搜索框。",
+    }
+
+
+def job_completeness(job):
+    checks = {
+        "city": bool(job.get("city")),
+        "salary": job.get("salary_min") is not None or job.get("annual_salary_min") is not None,
+        "experience": job.get("min_experience_years") is not None or bool(job.get("experience_band")),
+        "education": bool(job.get("required_education")),
+        "industry": bool(job.get("industry")),
+        "company_size": bool(job.get("company_size")),
+        "availability": job.get("is_active") is not None,
+        "captured_at": bool(job.get("captured_at")),
+    }
+    missing = [field for field, present in checks.items() if not present]
+    return {"score": round(100 * (len(checks) - len(missing)) / len(checks)), "missing": missing}
+
+
+def market_insights(rows, min_jobs=2):
+    """Aggregate requirements by exact job cluster so cross-site copies count once."""
+    candidates = [row for row in rows if row["assessment"]["status"] != "rejected"]
+    clusters = {}
+    platform_counts = Counter()
+    for row in candidates:
+        job = row["job"]
+        platform_counts[job["source_platform"]] += 1
+        cluster = clusters.setdefault(job["cluster_id"], {"rows": [], "requirements": set(), "platforms": set()})
+        cluster["rows"].append(row)
+        cluster["requirements"].update(job.get("requirements", []))
+        cluster["platforms"].add(job["source_platform"])
+    terms = {}
+    for cluster_id, cluster in clusters.items():
+        for term in cluster["requirements"]:
+            key = re.sub(r"\s+", " ", term.strip()).casefold()
+            item = terms.setdefault(key, {"term": term, "clusters": set(), "verified_clusters": set(), "jobs": set(), "platforms": set(), "supported": False, "explicit": False})
+            item["clusters"].add(cluster_id)
+            for row in cluster["rows"]:
+                if term in row["job"].get("requirements", []):
+                    item["jobs"].add(row["job"]["id"])
+                    item["platforms"].add(row["job"]["source_platform"])
+                    if row.get("requirements_origin", "provided") == "provided":
+                        item["verified_clusters"].add(cluster_id)
+                    item["supported"] = item["supported"] or term in row["assessment"]["evidence"]
+                    item["explicit"] = item["explicit"] or term in row["expression"]["explicit"]
+    total_clusters = len(clusters)
+    requirements = []
+    for item in terms.values():
+        term = item["term"]
+        state = "expressed" if item["explicit"] else "supported_hidden" if item["supported"] else "gap"
+        count, verified = len(item["clusters"]), len(item["verified_clusters"])
+        requirements.append({
+            "term": term, "cluster_count": count, "verified_cluster_count": verified, "job_count": len(item["jobs"]),
+            "share": round(100 * count / total_clusters) if total_clusters else 0,
+            "platforms": sorted(item["platforms"]), "state": state,
+            "recurring": verified >= min_jobs,
+        })
+    state_order = {"supported_hidden": 0, "gap": 1, "expressed": 2}
+    requirements.sort(key=lambda x: (-x["cluster_count"], state_order[x["state"]], x["term"].casefold()))
+    duplicate_groups = [{"cluster_id": cid, "job_ids": [r["job"]["id"] for r in value["rows"]],
+                         "platforms": sorted(value["platforms"]), "count": len(value["rows"])}
+                        for cid, value in clusters.items() if len(value["rows"]) > 1]
+    return {
+        "candidate_jobs": len(candidates), "distinct_job_clusters": total_clusters,
+        "platform_counts": dict(sorted(platform_counts.items())), "minimum_clusters": min_jobs,
+        "sample_sufficient": total_clusters >= min_jobs,
+        "requirements": requirements[:30], "recurring_requirements": [x for x in requirements if x["recurring"]][:30],
+        "duplicate_groups": duplicate_groups,
+        "note": "重复发布只计一个岗位簇，只有已核对 requirements 的岗位计入高频门槛。高频要求用于确定修改优先级；单个 JD 的词不会自动写入简历。",
+    }
+
+
+def annotate_suggestions(suggestions, market):
+    terms = {re.sub(r"\s+", " ", item["term"].strip()).casefold(): item for item in market["requirements"]}
+    for suggestion in suggestions:
+        related = [terms[key] for t in suggestion.get("terms", []) if (key := re.sub(r"\s+", " ", t.strip()).casefold()) in terms]
+        count = max((item["verified_cluster_count"] for item in related), default=1)
+        suggestion["market_cluster_count"] = count
+        suggestion["market_total_clusters"] = market["distinct_job_clusters"]
+        suggestion["scope"] = "recurring" if count >= market["minimum_clusters"] else "job_specific"
+    suggestions.sort(key=lambda s: (s["scope"] != "recurring", -s["market_cluster_count"], s["kind"], s["id"]))
+    return suggestions
 
 
 def inferred_job(profile, job):
@@ -196,9 +298,13 @@ def create_cycle(store, profile, policy, output, parent_id=None, ai=False, top=1
                 assessment["status"] = "rejected" if policy["unknown_policy"] == "exclude" else "needs_review"
                 if policy["unknown_policy"] == "exclude":
                     assessment["rejected_reasons"].append("岗位要求尚未核实，按设置排除")
-        rows.append({"job": job, "requirements_origin": origin, "assessment": assessment, "expression": expression_coverage(profile, assessment)})
-    rows.sort(key=lambda r: (r["assessment"]["status"] == "rejected", -r["assessment"]["score"], -len(r["assessment"]["preferred_hits"]), r["job"]["id"]))
+        rows.append({"job": job, "requirements_origin": origin, "assessment": assessment,
+                     "expression": expression_coverage(profile, assessment), "completeness": job_completeness(job)})
+    rows.sort(key=lambda r: (r["assessment"]["status"] == "rejected", bool(r["job"].get("risk_flags")),
+                             -r["assessment"]["score"], -len(r["assessment"]["preferred_hits"]),
+                             -r["completeness"]["score"], r["job"]["id"]))
     candidates = [r for r in rows if r["assessment"]["status"] != "rejected"][:top]
+    market = market_insights(rows, policy["market_min_jobs"])
     suggestions = []
     for row in candidates:
         suggestions.extend(diagnose(profile, row["job"], row["assessment"]))
@@ -206,12 +312,17 @@ def create_cycle(store, profile, policy, output, parent_id=None, ai=False, top=1
         from .llm import propose_rewrites
         jobs = [r["job"] for r in candidates[:5]]
         suggestions.extend(validated_ai_suggestions(profile, jobs, propose_rewrites(profile, jobs)))
+    suggestions = annotate_suggestions(suggestions, market)
     cycle_id = uuid.uuid4().hex[:16]
     directory = Path(output).resolve() / cycle_id
-    report = {"schema_version": 1, "id": cycle_id, "created_at": now(), "parent_id": parent_id, "profile_hash": digest(profile), "policy_hash": digest(policy),
+    report = {"schema_version": 2, "id": cycle_id, "created_at": now(), "parent_id": parent_id, "profile_hash": digest(profile), "policy_hash": digest(policy),
               "profile": copy.deepcopy(profile), "policy": copy.deepcopy(policy), "search_plan": search_plan(profile, policy), "jobs": rows, "suggestions": suggestions,
-              "comparison": compare_cycles(previous, profile, policy, rows), "engine": "rules+ai_drafts" if ai else "rules",
-              "summary": {"total": len(rows), "candidates": len(candidates), "matched": sum(r["assessment"]["status"] == "matched" for r in rows), "needs_review": sum(r["assessment"]["status"] == "needs_review" for r in rows), "rejected": sum(r["assessment"]["status"] == "rejected" for r in rows)}}
+              "market": market, "comparison": compare_cycles(previous, profile, policy, rows), "engine": "rules+ai_drafts" if ai else "rules",
+              "summary": {"total": len(rows), "candidates": len(candidates), "matched": sum(r["assessment"]["status"] == "matched" for r in rows),
+                          "needs_review": sum(r["assessment"]["status"] == "needs_review" for r in rows),
+                          "rejected": sum(r["assessment"]["status"] == "rejected" for r in rows),
+                          "risk_flagged": sum(bool(r["job"].get("risk_flags")) for r in rows),
+                          "duplicate_clusters": len(market["duplicate_groups"])}}
     directory.mkdir(parents=True, exist_ok=False)
     # Generate previews only; do not change the application queue or enable sending.
     for row in candidates:

@@ -1,5 +1,6 @@
 {
   "name": "示例表单适配协议 — 非真实招聘站点",
+  "platform": "other",
   "verified": false,
   "allowed_hosts": ["example.invalid"],
   "identity": {
