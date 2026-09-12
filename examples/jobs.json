@@ -1,0 +1,32 @@
+[
+  {
+    "url": "https://example.invalid/jobs/001",
+    "title": "AI产品经理",
+    "company": "示例招聘公司",
+    "city": "上海",
+    "salary_min": 25000,
+    "salary_max": 35000,
+    "description": "负责企业知识库的需求分析，设计 RAG 应用并组织验收。此岗位仅为测试数据。",
+    "requirements": ["需求分析", "RAG", "知识库", "验收"]
+  },
+  {
+    "url": "https://example.invalid/jobs/002",
+    "title": "AI产品经理",
+    "company": "示例待核实公司",
+    "city": "",
+    "salary_min": null,
+    "salary_max": null,
+    "description": "负责大模型训练平台，要求 CUDA 和分布式训练经验。此岗位仅为测试数据。",
+    "requirements": ["CUDA", "分布式训练"]
+  },
+  {
+    "url": "https://example.invalid/jobs/003",
+    "title": "AI产品经理",
+    "company": "示例排除公司",
+    "city": "上海",
+    "salary_min": 25000,
+    "salary_max": 35000,
+    "description": "知识库与 RAG 应用。此岗位仅为测试数据。",
+    "requirements": ["RAG", "知识库"]
+  }
+]
