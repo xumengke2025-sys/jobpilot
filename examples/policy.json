@@ -1,0 +1,8 @@
+{
+  "cities": ["上海"],
+  "min_monthly_salary": 20000,
+  "target_titles": ["AI产品", "AI 产品", "大模型产品"],
+  "excluded_companies": ["示例排除公司"],
+  "excluded_terms": [],
+  "min_score": 70
+}
