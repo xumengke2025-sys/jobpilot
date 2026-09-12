@@ -46,7 +46,8 @@ def render_report(r):
         platform = {"boss": "BOSS直聘", "liepin": "猎聘", "other": "其他来源"}.get(job.get("source_platform"), job.get("source_platform", "其他来源"))
         risks = "；".join(flag["label"] for flag in job.get("risk_flags", []))
         quality = f'字段完整度 {row.get("completeness", {}).get("score", 0)}%'
-        rows.append(f'<tr><td><a href="{e(job["url"])}" target="_blank" rel="noopener noreferrer">{e(job["title"])}</a><small>{e(platform)} · {e(job["company"])} · {e(place)}</small><small>{e(salary)} · {e(job.get("experience_band") or "经验未知")} · {e(job.get("required_education") or "学历未知")}</small>{preview}</td><td>{a["score"]}%<small>{e(source)} · {e(quality)}</small></td><td>{expr}</td><td>{labels[a["status"]]}<small>{e(reasons)}</small>{f"<small class='risk'>风险复核：{e(risks)}</small>" if risks else ""}</td></tr><tr class="detail"><td colspan="4"><b>匹配证据：</b>{e(evidence)}<br><b>缺口：</b>{e(missing)}</td></tr>')
+        risk_html = f"<small class='risk'>风险复核：{e(risks)}</small>" if risks else ""
+        rows.append(f'<tr><td><a href="{e(job["url"])}" target="_blank" rel="noopener noreferrer">{e(job["title"])}</a><small>{e(platform)} · {e(job["company"])} · {e(place)}</small><small>{e(salary)} · {e(job.get("experience_band") or "经验未知")} · {e(job.get("required_education") or "学历未知")}</small>{preview}</td><td>{a["score"]}%<small>{e(source)} · {e(quality)}</small></td><td>{expr}</td><td>{labels[a["status"]]}<small>{e(reasons)}</small>{risk_html}</td></tr><tr class="detail"><td colspan="4"><b>匹配证据：</b>{e(evidence)}<br><b>缺口：</b>{e(missing)}</td></tr>')
     cards = []
     for s in r["suggestions"]:
         job = jobs[s["job_id"]]["job"]
