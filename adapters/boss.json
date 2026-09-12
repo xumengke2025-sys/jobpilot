@@ -1,0 +1,15 @@
+{
+  "name": "BOSS — 待登录页面实测",
+  "verified": false,
+  "allowed_hosts": ["www.zhipin.com", "zhipin.com"],
+  "identity": {
+    "company": {"css": "[data-jobpilot-configure-company]"},
+    "title": {"css": "[data-jobpilot-configure-title]"}
+  },
+  "stop_when_visible": [
+    {"css": "[data-jobpilot-configure-captcha]"},
+    {"css": "[data-jobpilot-configure-login]"}
+  ],
+  "steps": [],
+  "notes": "占位配置，不可投递。需在真实账号页面确定身份定位、沟通入口、消息输入、附件选择及回执后填写；不能仅将 verified 改为 true。"
+}
