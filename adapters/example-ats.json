@@ -1,0 +1,28 @@
+{
+  "name": "示例表单适配协议 — 非真实招聘站点",
+  "verified": false,
+  "allowed_hosts": ["example.invalid"],
+  "identity": {
+    "company": {"css": "#company"},
+    "title": {"css": "#job-title"}
+  },
+  "stop_when_visible": [{"css": "#captcha"}, {"css": "#rate-limit"}],
+  "interval_seconds": 15,
+  "steps": [
+    {"op": "fill", "locator": {"label": "自我介绍"}, "source": "greeting"},
+    {"op": "upload", "locator": {"css": "input[type=file]"}, "source": "resume.docx"},
+    {"op": "click", "locator": {"role": "button", "name": "提交申请"}},
+    {"op": "verify", "locator": {"css": "#receipt"}, "contains": "申请已提交", "state": "submitted"}
+  ],
+  "collect": {
+    "card_css": ".job-card",
+    "link_css": "a.job-link",
+    "detail": {
+      "title": {"css": "#job-title"},
+      "company": {"css": "#company"},
+      "description": {"css": "#description"},
+      "city": {"css": "#city"}
+    },
+    "next": {"role": "button", "name": "下一页"}
+  }
+}
